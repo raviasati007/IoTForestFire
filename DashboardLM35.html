@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Forest Fire Detection Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Important for mobile -->
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #eef1f5;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    header h1 {
+      font-size: 24px;
+      margin: 0;
+      color: #0078d7;
+    }
+    header p {
+      font-size: 14px;
+      margin: 5px 0;
+      color: #555;
+    }
+    .dashboard {
+      display: flex;
+      flex-wrap: wrap; /* allow wrapping on smaller screens */
+      gap: 20px;
+    }
+    .card {
+      flex: 1 1 300px; /* flexible width, minimum 300px */
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .card h2 {
+      font-size: 18px;
+      margin-bottom: 10px;
+      color: #0078d7;
+      text-align: center;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #0078d7;
+      color: #fff;
+    }
+    .chart-container {
+      width: 100%;
+      max-width: 100%;
+    }
+    canvas {
+      width: 100% !important;
+      height: auto !important;
+    }
+    .thermometer {
+      position: relative;
+      width: 40px;
+      height: 200px;
+      background: linear-gradient(to top, blue, red);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: inset 0 0 8px rgba(0,0,0,0.3);
+      margin-bottom: 10px;
+    }
+    .mercury {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      background: rgba(255,255,255,0.6);
+      height: 40%;
+      transition: height 0.5s ease;
+    }
+    .temp-label {
+      font-size: 18px;
+      font-weight: bold;
+      color: #e74c3c;
+    }
+
+    /* Media Queries for smaller devices */
+    @media (max-width: 768px) {
+      header h1 { font-size: 20px; }
+      .card { flex: 1 1 100%; } /* stack cards vertically */
+      table, th, td { font-size: 12px; }
+      .thermometer { height: 150px; width: 30px; }
+      .temp-label { font-size: 16px; }
+    }
+
+    @media (max-width: 480px) {
+      body { padding: 10px; }
+      header h1 { font-size: 18px; }
+      .card { padding: 10px; }
+      table, th, td { font-size: 11px; }
+      .thermometer { height: 120px; width: 25px; }
+      .temp-label { font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Forest Fire Detection Using Wireless Sensor Networks</h1>
+    <p id="date"></p>
+    <p id="timer">Next refresh in: 45s</p>
+    <p id="temperature">Loading temperature...</p>
+  </header>
+
+  <div class="dashboard">
+    <!-- Temperature Table Card -->
+    <div class="card">
+      <h2>Temperature Records</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Timestamp</th>
+            <th>Temperature (°C)</th>
+          </tr>
+        </thead>
+        <tbody id="tempTable"></tbody>
+      </table>
+    </div>
+
+    <!-- Chart Card -->
+    <div class="card">
+      <h2>Temperature Trend</h2>
+      <div class="chart-container">
+        <canvas id="tempChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Thermometer Card -->
+    <div class="card">
+      <h2>Live Thermometer</h2>
+      <div class="thermometer">
+        <div class="mercury" id="mercury"></div>
+      </div>
+      <div class="temp-label" id="tempLabel">--°</div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('date').textContent = "Date: " + new Date().toLocaleDateString();
+
+    let countdown = 45;
+    let records = [];
+    let chart;
+
+    function fetchTemperature() {
+      fetch("https://cloud.boltiot.com/remote/3f23659d-b923-4dac-aa2e-34785f82818c/analogRead?deviceName=BOLT3451804&pin=A0")
+        .then(response => response.json())
+        .then(data => {
+          let raw = parseInt(data.value);
+          let temp = (raw * 100) / 1024;
+          let timestamp = new Date().toLocaleTimeString();
+
+          records.unshift({time: timestamp, value: temp.toFixed(2)});
+          if (records.length > 10) records.pop();
+
+          document.getElementById("temperature").innerText = "Latest Temperature: " + temp.toFixed(2) + " °C";
+          updateTable();
+          updateChart();
+          updateThermometer(temp);
+        })
+        .catch(error => {
+          document.getElementById("temperature").innerText = "Error fetching data";
+          console.error(error);
+        });
+    }
+
+    function updateTable() {
+      let tableBody = document.getElementById("tempTable");
+      tableBody.innerHTML = "";
+      records.forEach((record, index) => {
+        let row = `<tr>
+                     <td>${index + 1}</td>
+                     <td>${record.time}</td>
+                     <td>${record.value} °C</td>
+                   </tr>`;
+        tableBody.innerHTML += row;
+      });
+    }
+
+    function updateChart() {
+      const times = records.map(r => r.time).reverse();
+      const temps = records.map(r => r.value).reverse();
+      if (!chart) {
+        const ctx = document.getElementById('tempChart').getContext('2d');
+        chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: times,
+            datasets: [{
+              label: 'Temperature (°C)',
+              data: temps,
+              borderColor: '#e74c3c',
+              backgroundColor: 'rgba(231,76,60,0.2)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 3
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+              x: { title: { display: true, text: 'Time' } },
+              y: { title: { display: true, text: 'Temperature (°C)' }, min: 0, max: 100 }
+            }
+          }
+        });
+      } else {
+        chart.data.labels = times;
+        chart.data.datasets[0].data = temps;
+        chart.update();
+      }
+    }
+
+    function updateThermometer(temp) {
+      document.getElementById('tempLabel').textContent = temp.toFixed(2) + "°";
+      document.getElementById('mercury').style.height = (temp/100*100) + "%";
+    }
+
+    function startCountdown() {
+      countdown = 45;
+      document.getElementById("timer").innerText = "Next refresh in: " + countdown + "s";
+      let interval = setInterval(() => {
+        countdown--;
+        document.getElementById("timer").innerText = "Next refresh in: " + countdown + "s";
+        if (countdown <= 0) {
+          clearInterval(interval);
+          fetchTemperature();
+          startCountdown();
+        }
+      }, 1000);
+    }
+
+    window.onload = function() {
+      fetchTemperature();
+      startCountdown();
+    };
+  </script>
+</body>
+</html>

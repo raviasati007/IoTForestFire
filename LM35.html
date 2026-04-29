@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bolt IoT Temperature Monitor</title>
+  <script>
+    let countdown = 45;
+    let records = [];
+
+    function fetchTemperature() {
+      fetch("https://cloud.boltiot.com/remote/3f23659d-b923-4dac-aa2e-34785f82818c/analogRead?deviceName=BOLT3451804&pin=A0")
+        .then(response => response.json())
+        .then(data => {
+          let raw = parseInt(data.value);   // Raw analog value (0–1023)
+          let temp = (raw * 100) / 1024;    // Convert to °C (LM35: 10mV/°C, Bolt ADC: 0–1V → 0–1023)
+          let timestamp = new Date().toLocaleString();
+
+          // Add new record at the start
+          records.unshift({time: timestamp, value: temp.toFixed(2)});
+          if (records.length > 10) records.pop();
+
+          // Update latest temperature
+          document.getElementById("temperature").innerText = "Latest Temperature: " + temp.toFixed(2) + " °C";
+          updateTable();
+        })
+        .catch(error => {
+          document.getElementById("temperature").innerText = "Error fetching data";
+          console.error(error);
+        });
+    }
+
+    function updateTable() {
+      let tableBody = document.getElementById("dataTableBody");
+      tableBody.innerHTML = "";
+      records.forEach((record, index) => {
+        let row = `<tr>
+                     <td>${index + 1}</td>
+                     <td>${record.time}</td>
+                     <td>${record.value} °C</td>
+                   </tr>`;
+        tableBody.innerHTML += row;
+      });
+    }
+
+    function startCountdown() {
+      countdown = 45;
+      document.getElementById("timer").innerText = "Next refresh in: " + countdown + "s";
+      let interval = setInterval(() => {
+        countdown--;
+        document.getElementById("timer").innerText = "Next refresh in: " + countdown + "s";
+        if (countdown <= 0) {
+          clearInterval(interval);
+          fetchTemperature();
+          startCountdown();
+        }
+      }, 1000);
+    }
+
+    window.onload = function() {
+      fetchTemperature();
+      startCountdown();
+    };
+  </script>
+</head>
+<body>
+  <h1>Bolt IoT Temperature Data</h1>
+  <p id="temperature">Loading temperature...</p>
+  <p id="timer">Next refresh in: 45s</p>
+
+  <h2>Last 10 Records</h2>
+  <table border="1" cellpadding="5">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Timestamp</th>
+        <th>Temperature (°C)</th>
+      </tr>
+    </thead>
+    <tbody id="dataTableBody">
+      <!-- Records will be inserted here -->
+    </tbody>
+  </table>
+</body>
+</html>
