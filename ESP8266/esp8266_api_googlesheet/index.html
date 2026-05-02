@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ESP8266 Sensor Dashboard</title>
+  <style>
+    table { border-collapse: collapse; width: 80%; margin: 20px auto; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #f4f4f4; }
+  </style>
+</head>
+<body>
+  <h1 style="text-align:center;">ESP8266 Sensor Data Dashboard</h1>
+  <table id="dataTable">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Temperature (°C)</th>
+        <th>Humidity (%)</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    // Replace with your Google Sheet CSV export link
+    const sheetUrl = "https://docs.google.com/spreadsheets/d/15_aU5tbT8h9bJVk5SDiD08nE8TQa2A-MlQSkRym0myM/export?format=csv&gid=0";
+
+
+    async function loadData() {
+      const response = await fetch(sheetUrl);
+      const text = await response.text();
+      const rows = text.split("\n").map(r => r.split(","));
+
+      const tbody = document.querySelector("#dataTable tbody");
+      tbody.innerHTML = "";
+
+      rows.slice(1).forEach(row => {
+        if (row.length >= 3) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${row[0]}</td><td>${row[1]}</td><td>${row[2]}</td>`;
+          tbody.appendChild(tr);
+        }
+      });
+    }
+
+    loadData();
+    setInterval(loadData, 10000); // refresh every 10s
+  </script>
+</body>
+</html>
