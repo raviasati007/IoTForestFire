@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ESP8266 Sensor Dashboard</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #f9fafc;
+      margin: 0;
+      padding: 0;
+      color: #333;
+    }
+
+    header {
+      background: #0078d7;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.8em;
+    }
+
+    #countdown {
+      font-size: 1.2em;
+      margin-top: 8px;
+      color: #ffeb3b;
+      font-weight: bold;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      overflow-x: auto;
+    }
+
+    .cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      flex: 1;
+      min-width: 250px;
+      background: #f4f6f8;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 1.2em;
+      color: #0078d7;
+    }
+
+    .card .value {
+      font-size: 2em;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+      min-width: 500px;
+    }
+
+    th, td {
+      border: 1px solid #e0e0e0;
+      padding: 12px;
+      text-align: center;
+      font-size: 1em;
+    }
+
+    th {
+      background: #f4f6f8;
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) {
+      background: #f9f9f9;
+    }
+
+    tr:hover {
+      background: #eef6ff;
+    }
+
+    footer {
+      text-align: center;
+      padding: 15px;
+      font-size: 0.9em;
+      color: #666;
+    }
+
+    /* Responsive styles */
+    @media (max-width: 768px) {
+      h1 { font-size: 1.5em; }
+      th, td { padding: 10px; font-size: 0.9em; }
+      .container { margin: 15px; padding: 15px; }
+    }
+
+    @media (max-width: 480px) {
+      h1 { font-size: 1.2em; }
+      th, td { padding: 8px; font-size: 0.8em; }
+      footer { font-size: 0.8em; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ESP8266 Sensor Data Dashboard</h1>
+    <div id="countdown">Next update in 10s</div>
+  </header>
+
+  <div class="container">
+    <!-- Cards Section -->
+    <div class="cards">
+      <div class="card" id="humidityCard">
+        <h2>Humidity</h2>
+        <div class="value" id="humidityValue">--%</div>
+        <div id="humidityStatus">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Table Section -->
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Temperature (°C)</th>
+          <th>Humidity (%)</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <footer>
+    Data auto-refreshes every 10 seconds
+  </footer>
+
+  <script>
+    const sheetUrl = "https://docs.google.com/spreadsheets/d/15_aU5tbT8h9bJVk5SDiD08nE8TQa2A-MlQSkRym0myM/export?format=csv&gid=0";
+    let countdown = 10;
+    let countdownInterval;
+
+    async function loadData() {
+      const response = await fetch(sheetUrl);
+      const text = await response.text();
+      const rows = text.split("\n").map(r => r.split(","));
+
+      const tbody = document.querySelector("#dataTable tbody");
+      tbody.innerHTML = "";
+
+      const dataRows = rows.slice(1);
+      const latestRows = dataRows.slice(-10).reverse();
+
+      latestRows.forEach(row => {
+        if (row.length >= 3) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${row[0]}</td><td>${row[1]}</td><td>${row[2]}</td>`;
+          tbody.appendChild(tr);
+        }
+      });
+
+      // Update Humidity Card
+      if (latestRows.length > 0) {
+        const latestHumidity = latestRows[0][2];
+        document.getElementById("humidityValue").textContent = latestHumidity + "%";
+
+        let status = "Normal 🙂";
+        if (parseFloat(latestHumidity) < 30) status = "Low Humidity ⚠️";
+        else if (parseFloat(latestHumidity) > 70) status = "High Humidity ⚠️";
+
+        document.getElementById("humidityStatus").textContent = status;
+      }
+
+      // Reset countdown
+      resetCountdown();
+    }
+
+    function resetCountdown() {
+      clearInterval(countdownInterval);
+      countdown = 10;
+      document.getElementById("countdown").textContent = "Next update in " + countdown + "s";
+      countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdown <= 0) {
+          clearInterval(countdownInterval);
+        }
+        document.getElementById("countdown").textContent = "Next update in " + countdown + "s";
+      }, 1000);
+    }
+
+    loadData();
+    setInterval(loadData, 10000); // refresh every 10s
+  </script>
+</body>
+</html>
