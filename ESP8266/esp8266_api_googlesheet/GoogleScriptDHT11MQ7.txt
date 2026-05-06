@@ -1,0 +1,32 @@
+function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  
+  // Safely parse incoming JSON
+  var data;
+  try {
+    data = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return ContentService.createTextOutput("Invalid JSON: " + err);
+  }
+
+  // Ensure all fields exist before appending
+  var temperature = data.temperature || "";
+  var humidity = data.humidity || "";
+  var mq7_raw = data.mq7_raw || "";
+  var mq7_voltage = data.mq7_voltage || "";
+
+  // Append row with timestamp + all sensor values
+  sheet.appendRow([
+    new Date(),
+    temperature,
+    humidity,
+    mq7_raw,
+    mq7_voltage
+  ]);
+
+  return ContentService.createTextOutput("Data added successfully");
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput("GET request received");
+}
